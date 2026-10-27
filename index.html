@@ -75,8 +75,8 @@
                             }
                         }
                     }
-                    if (f) break;
                 }
+                if (f) break;
             }
             if (!f) {
                 for (let i = 0; i < 25; i++) {
@@ -92,8 +92,8 @@
                                 }
                             }
                         }
-                        if (f) break;
                     }
+                    if (f) break;
                 }
             }
             if (f && pendingHintCell !== null) { document.getElementById('hint-explanation').innerHTML = txt; document.getElementById('hint-explanation').style.display = "block"; document.getElementById('btn-apply').style.display = "inline-block"; drawGrid(); }
