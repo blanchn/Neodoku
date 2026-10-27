@@ -40,12 +40,12 @@
         const layoutString = "0001102213224334444344433";
         const regions = layoutString.split("").map(function(c) { return parseInt(c, 10); });
         const solution = [false, true, false, false, false, false, false, false, true, false, true, false, false, false, false, false, false, true, false, false, false, false, false, false, true];
-        let playerGrid = Array(25).fill(""); let hearts = 3; let clickTimers = {}; let pendingHintCells = [];
+        let playerGrid = Array(25).fill(""); let hearts = 3; let clickTimers = {}; let pendingHintCell = null;
         function drawGrid() {
             const g = document.getElementById('game-grid'); g.innerHTML = "";
             for (let i = 0; i < 25; i++) {
                 const c = document.createElement('div'); c.className = "cell reg-" + regions[i]; c.textContent = playerGrid[i];
-                if (pendingHintCells.includes(i) && playerGrid[i] === "") { c.classList.add('hint-preview'); c.textContent = "❓"; }
+                if (pendingHintCell === i && playerGrid[i] === "") { c.classList.add('hint-preview'); c.textContent = "❓"; }
                 c.addEventListener('click', function(e) { e.preventDefault(); handleGridTouch(i, c); }); g.appendChild(c);
             }
         }
@@ -61,28 +61,46 @@
             else { hearts--; updateHearts(); ce.classList.add('wrong'); setTimeout(function() { ce.classList.remove('wrong'); }, 500); if (hearts <= 0) alert("Dommage ! Plus de cœurs."); }
         }
         function prepareHint() {
-            if (hearts <= 0) return; cancelCurrentHint(); let f = false; let txt = ""; pendingHintCells = [];
+            if (hearts <= 0) return; cancelCurrentHint(); let f = false; let txt = ""; pendingHintCell = null;
             for (let i = 0; i < 25; i++) {
                 if (playerGrid[i] === "🐱") {
                     let r = Math.floor(i / 5), c = i % 5, reg = regions[i];
-                    for (let j = 0; j < 25; j++) { if (i !== j && playerGrid[j] === "") { let row = Math.floor(j / 5), col = j % 5; if (row === r || col === c || regions[j] === reg) pendingHintCells.push(j); } }
-                    if (pendingHintCells.length > 0) { txt = "💡 <strong>Logique :</strong> Votre chat en Ligne " + (r + 1) + ", Col " + (c + 1) + " bloque cette zone. Les cases avec ❓ ne peuvent pas contenir de chat !"; f = true; break; }
+                    for (let j = 0; j < 25; j++) {
+                        if (i !== j && playerGrid[j] === "") {
+                            let row = Math.floor(j / 5), col = j % 5;
+                            if (row === r || col === c || regions[j] === reg) {
+                                pendingHintCell = j;
+                                txt = "💡 <strong>Indice :</strong> La case clignotante (Ligne " + (row + 1) + ", Col " + (col + 1) + ") ne peut pas contenir de chat car elle est bloquée par votre chat en Ligne " + (r + 1) + ", Col " + (c + 1) + ".";
+                                f = true; break;
+                            }
+                        }
+                    }
+                    if (f) break;
                 }
             }
             if (!f) {
                 for (let i = 0; i < 25; i++) {
                     if (solution[i] === true && playerGrid[i] !== "🐱") {
                         let r = Math.floor(i / 5), c = i % 5, reg = regions[i];
-                        for (let j = 0; j < 25; j++) { if (i !== j && playerGrid[j] === "") { let row = Math.floor(j / 5), col = j % 5; if (row === r || col === c || regions[j] === reg) pendingHintCells.push(j); } }
-                        if (pendingHintCells.length > 0) { txt = "💡 <strong>Logique :</strong> Un chat doit occuper la Ligne " + (r + 1) + " ou la zone <strong>" + getRegionName(reg) + "</strong>. Éliminez ces cases clignotantes !"; f = true; break; }
+                        for (let j = 0; j < 25; j++) {
+                            if (i !== j && playerGrid[j] === "") {
+                                let row = Math.floor(j / 5), col = j % 5;
+                                if (row === r || col === c || regions[j] === reg) {
+                                    pendingHintCell = j;
+                                    txt = "💡 <strong>Indice :</strong> La Ligne " + (r + 1) + " ou la zone <strong>" + getRegionName(reg) + "</strong> doit obligatoirement abriter un chat ailleurs. La case clignotante (Ligne " + (row + 1) + ", Col " + (col + 1) + ") doit donc être éliminée.";
+                                    f = true; break;
+                                }
+                            }
+                        }
+                        if (f) break;
                     }
                 }
             }
-            if (f && pendingHintCells.length > 0) { document.getElementById('hint-explanation').innerHTML = txt; document.getElementById('hint-explanation').style.display = "block"; document.getElementById('btn-apply').style.display = "inline-block"; drawGrid(); }
+            if (f && pendingHintCell !== null) { document.getElementById('hint-explanation').innerHTML = txt; document.getElementById('hint-explanation').style.display = "block"; document.getElementById('btn-apply').style.display = "inline-block"; drawGrid(); }
             else { alert("Toutes les cases invalides évidentes ont déjà été marquées."); }
         }
-        function applyHint() { if (pendingHintCells.length === 0) return; pendingHintCells.forEach(function(i) { if (playerGrid[i] === "") playerGrid[i] = "❌"; }); cancelCurrentHint(); }
-        function cancelCurrentHint() { pendingHintCells = []; document.getElementById('hint-explanation').style.display = "none"; document.getElementById('btn-apply').style.display = "none"; drawGrid(); }
+        function applyHint() { if (pendingHintCell === null) return; if (playerGrid[pendingHintCell] === "") playerGrid[pendingHintCell] = "❌"; cancelCurrentHint(); }
+        function cancelCurrentHint() { pendingHintCell = null; document.getElementById('hint-explanation').style.display = "none"; document.getElementById('btn-apply').style.display = "none"; drawGrid(); }
         function getRegionName(id) { const n = ["Rose", "Verte", "Bleue", "Jaune", "Violette"]; return n[id] || "Inconnue"; }
         function updateHearts() { document.getElementById('hearts-display').textContent = "❤️".repeat(Math.max(0, hearts)) || "☠️ Game Over"; }
         function checkWinCondition() { let w = true; for (let i = 0; i < 25; i++) { if (solution[i] === true && playerGrid[i] !== "🐱") w = false; } if (w) { setTimeout(function() { alert("🎉 Miaou-gnifique !"); cancelCurrentHint(); }, 200); } }
