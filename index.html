@@ -120,6 +120,10 @@
             border-radius: 10px;
             cursor: pointer;
         }
+
+        .hint-btn {
+            background-color: #ff8e9e;
+        }
     </style>
 </head>
 <body>
@@ -142,6 +146,7 @@
         <div class="grid" id="game-grid"></div>
 
         <div class="tools">
+            <button class="action-btn hint-btn" onclick="giveHint()">Indice 💡</button>
             <button class="action-btn" onclick="resetBoard()">Recommencer</button>
         </div>
     </div>
@@ -231,6 +236,54 @@
                 if (hearts <= 0) {
                     alert("Dommage ! Plus de cœurs disponibles. Cliquez sur Recommencer.");
                 }
+            }
+        }
+
+        function giveHint() {
+            if (hearts <= 0) return;
+
+            // Trouver un chat de la solution qui n'a pas encore été trouvé par le joueur
+            let targetIndex = -1;
+            for (let i = 0; i < 25; i++) {
+                if (solution[i] === true && playerGrid[i] !== "🐱") {
+                    targetIndex = i;
+                    break;
+                }
+            }
+
+            // Si tous les chats sont déjà placés
+            if (targetIndex === -1) {
+                alert("Vous avez déjà trouvé l'emplacement de tous les chats ! Remplissez le reste avec des croix ❌.");
+                return;
+            }
+
+            // Calculer la ligne et la colonne du chat cible
+            let targetRow = Math.floor(targetIndex / 5);
+            let targetCol = targetIndex % 5;
+            let targetRegion = regions[targetIndex];
+
+            // Remplir stratégiquement la grille avec des croix d'aide
+            let addedX = false;
+            for (let i = 0; i < 25; i++) {
+                let row = Math.floor(i / 5);
+                let col = i % 5;
+                
+                // Si la case fait partie de la même ligne, colonne ou région, mais n'est pas le chat lui-même
+                if (i !== targetIndex && (row === targetRow || col === targetCol || regions[i] === targetRegion)) {
+                    if (playerGrid[i] === "") {
+                        playerGrid[i] = "❌";
+                        addedX = true;
+                    }
+                }
+            }
+
+            if (addedX) {
+                drawGrid();
+            } else {
+                // Si les croix d'aide étaient déjà là, on montre directement l'emplacement du chat
+                playerGrid[targetIndex] = "🐱";
+                drawGrid();
+                checkWinCondition();
             }
         }
 
