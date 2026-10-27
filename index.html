@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NekoDoku</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
         :root { --bg-color: #fcf8f2; --card-color: #ffffff; --text-color: #3c2f2f; --border-color: #dcd6cd; --color-0: #ffdfdf; --color-1: #dfffee; --color-2: #dfeeff; --color-3: #fffeed; --color-4: #f3dfff; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; user-select: none; -webkit-user-select: none; }
@@ -16,10 +15,9 @@
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 4px; width: 100%; aspect-ratio: 1 / 1; background-color: var(--border-color); padding: 4px; border-radius: 12px; box-sizing: border-box; }
         .cell { background-color: var(--card-color); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: pointer; border-radius: 6px; transition: background-color 0.2s; touch-action: manipulation; position: relative; }
         .reg-0 { background-color: var(--color-0); } .reg-1 { background-color: var(--color-1); } .reg-2 { background-color: var(--color-2); } .reg-3 { background-color: var(--color-3); } .reg-4 { background-color: var(--color-4); }
-        .cell.wrong { background-color: #ffb3b3 !important; }
-        .cell.hint-preview { animation: pulse-hint 1.5s infinite alternate; z-index: 5; }
+        .cell.wrong { background-color: #ffb3b3 !important; } .cell.hint-preview { animation: pulse-hint 1.5s infinite alternate; z-index: 5; }
         @keyframes pulse-hint { 0% { box-shadow: inset 0 0 0 3px #ecc94b; background-color: #fefcbf; } 100% { box-shadow: inset 0 0 0 5px #d69e2e; background-color: #faf089; } }
-        .hint-box { display: none; background-color: #feebc8; border: 1px solid #fbd38d; color: #c05621; padding: 12px; border-radius: 10px; font-size: 0.9rem; line-height: 1.4; font-weight: 500; }
+        .hint-box { display: none; background-color: #feebc8; border: 1px solid #fbd38d; color: #c05621; padding: 12px; border-radius: 10px; font-size: 0.9rem; line-height: 1.4; font-weight: 500; margin-top: 5px; }
         .tools { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
         .action-btn { flex: 1; min-width: 120px; padding: 12px; font-size: 1.05rem; font-weight: bold; background-color: #4a5568; color: white; border: none; border-radius: 10px; cursor: pointer; }
         .hint-btn { background-color: #ff8e9e; } .apply-btn { background-color: #319795; display: none; }
@@ -40,56 +38,54 @@
     </div>
     <script>
         const layoutString = "0001102213224334444344433";
-        const regions = layoutString.split("").map(char => parseInt(char, 10));
+        const regions = layoutString.split("").map(function(c) { return parseInt(c, 10); });
         const solution = [false, true, false, false, false, false, false, false, true, false, true, false, false, false, false, false, false, true, false, false, false, false, false, false, true];
         let playerGrid = Array(25).fill(""); let hearts = 3; let clickTimers = {}; let pendingHintCells = [];
-
         function drawGrid() {
-            const gridEl = document.getElementById('game-grid'); gridEl.innerHTML = "";
+            const g = document.getElementById('game-grid'); g.innerHTML = "";
             for (let i = 0; i < 25; i++) {
-                const cell = document.createElement('div'); cell.className = "cell reg-" + regions[i]; cell.textContent = playerGrid[i];
-                if (pendingHintCells.includes(i) && playerGrid[i] === "") { cell.classList.add('hint-preview'); cell.textContent = "❓"; }
-                cell.addEventListener('click', (e) => { e.preventDefault(); handleGridTouch(i, cell); });
-                gridEl.appendChild(cell);
+                const c = document.createElement('div'); c.className = "cell reg-" + regions[i]; c.textContent = playerGrid[i];
+                if (pendingHintCells.includes(i) && playerGrid[i] === "") { c.classList.add('hint-preview'); c.textContent = "❓"; }
+                c.addEventListener('click', function(e) { e.preventDefault(); handleGridTouch(i, c); }); g.appendChild(c);
             }
         }
-        function handleGridTouch(index, cellElement) {
+        function handleGridTouch(i, ce) {
             if (hearts <= 0) return; cancelCurrentHint();
-            if (clickTimers[index]) { clearTimeout(clickTimers[index]); clickTimers[index] = null; executeDoubleClicks(index, cellElement); }
-            else { clickTimers[index] = setTimeout(() => { clickTimers[index] = null; executeSingleClick(index); }, 250); }
+            if (clickTimers[i]) { clearTimeout(clickTimers[i]); clickTimers[i] = null; executeDoubleClicks(i, ce); }
+            else { clickTimers[i] = setTimeout(function() { clickTimers[i] = null; executeSingleClick(i); }, 250); }
         }
-        function executeSingleClick(index) { playerGrid[index] = (playerGrid[index] === "❌" || playerGrid[index] === "🐱") ? "" : "❌"; drawGrid(); }
-        function executeDoubleClicks(index, cellElement) {
-            if (playerGrid[index] === "🐱") { playerGrid[index] = ""; drawGrid(); return; }
-            if (solution[index] === true) { playerGrid[index] = "🐱"; drawGrid(); checkWinCondition(); }
-            else { hearts--; updateHearts(); cellElement.classList.add('wrong'); setTimeout(() => cellElement.classList.remove('wrong'), 500); if (hearts <= 0) alert("Dommage ! Plus de cœurs."); }
+        function executeSingleClick(i) { playerGrid[i] = (playerGrid[i] === "❌" || playerGrid[i] === "🐱") ? "" : "❌"; drawGrid(); }
+        function executeDoubleClicks(i, ce) {
+            if (playerGrid[i] === "🐱") { playerGrid[i] = ""; drawGrid(); return; }
+            if (solution[i] === true) { playerGrid[i] = "🐱"; drawGrid(); checkWinCondition(); }
+            else { hearts--; updateHearts(); ce.classList.add('wrong'); setTimeout(function() { ce.classList.remove('wrong'); }, 500); if (hearts <= 0) alert("Dommage ! Plus de cœurs."); }
         }
         function prepareHint() {
-            if (hearts <= 0) return; cancelCurrentHint(); let hintFound = false; let explanationText = ""; pendingHintCells = [];
+            if (hearts <= 0) return; cancelCurrentHint(); let f = false; let txt = ""; pendingHintCells = [];
             for (let i = 0; i < 25; i++) {
                 if (playerGrid[i] === "🐱") {
-                    let row = Math.floor(i / 5), col = i % 5, reg = regions[i];
-                    for (let j = 0; j < 25; j++) { if (i !== j && playerGrid[j] === "") { let r = Math.floor(j / 5), c = j % 5; if (r === row || c === col || regions[j] === reg) pendingHintCells.push(j); } }
-                    if (pendingHintCells.length > 0) { explanationText = `💡 <strong>Logique :</strong> Votre chat en Ligne ${row + 1}, Col ${col + 1} bloque cette zone. Les cases avec ❓ ne peuvent pas contenir de chat !`; hintFound = true; break; }
+                    let r = Math.floor(i / 5), c = i % 5, reg = regions[i];
+                    for (let j = 0; j < 25; j++) { if (i !== j && playerGrid[j] === "") { let row = Math.floor(j / 5), col = j % 5; if (row === r || col === c || regions[j] === reg) pendingHintCells.push(j); } }
+                    if (pendingHintCells.length > 0) { txt = "💡 <strong>Logique :</strong> Votre chat en Ligne " + (r + 1) + ", Col " + (c + 1) + " bloque cette zone. Les cases avec ❓ ne peuvent pas contenir de chat !"; f = true; break; }
                 }
             }
-            if (!hintFound) {
+            if (!f) {
                 for (let i = 0; i < 25; i++) {
                     if (solution[i] === true && playerGrid[i] !== "🐱") {
-                        let row = Math.floor(i / 5), col = i % 5, reg = regions[i];
-                        for (let j = 0; j < 25; j++) { if (i !== j && playerGrid[j] === "") { let r = Math.floor(j / 5), c = j % 5; if (r === row || c === col || regions[j] === reg) pendingHintCells.push(j); } }
-                        if (pendingHintCells.length > 0) { explanationText = `💡 <strong>Logique :</strong> Un chat doit occuper la Ligne ${row + 1} ou la zone <strong>${getRegionName(reg)}</strong>. Éliminez ces cases clignotantes !`; hintFound = true; break; }
+                        let r = Math.floor(i / 5), c = i % 5, reg = regions[i];
+                        for (let j = 0; j < 25; j++) { if (i !== j && playerGrid[j] === "") { let row = Math.floor(j / 5), col = j % 5; if (row === r || col === c || regions[j] === reg) pendingHintCells.push(j); } }
+                        if (pendingHintCells.length > 0) { txt = "💡 <strong>Logique :</strong> Un chat doit occuper la Ligne " + (r + 1) + " ou la zone <strong>" + getRegionName(reg) + "</strong>. Éliminez ces cases clignotantes !"; f = true; break; }
                     }
                 }
             }
-            if (hintFound && pendingHintCells.length > 0) { document.getElementById('hint-explanation').innerHTML = explanationText; document.getElementById('hint-explanation').style.display = "block"; document.getElementById('btn-apply').style.display = "inline-block"; drawGrid(); }
-            else { alert("Toutes les cases invalides évidentes sont déjà marquées."); }
+            if (f && pendingHintCells.length > 0) { document.getElementById('hint-explanation').innerHTML = txt; document.getElementById('hint-explanation').style.display = "block"; document.getElementById('btn-apply').style.display = "inline-block"; drawGrid(); }
+            else { alert("Toutes les cases invalides évidentes ont déjà été marquées."); }
         }
-        function applyHint() { if (pendingHintCells.length === 0) return; pendingHintCells.forEach(index => { if (playerGrid[index] === "") playerGrid[index] = "❌"; }); cancelCurrentHint(); }
+        function applyHint() { if (pendingHintCells.length === 0) return; pendingHintCells.forEach(function(i) { if (playerGrid[i] === "") playerGrid[i] = "❌"; }); cancelCurrentHint(); }
         function cancelCurrentHint() { pendingHintCells = []; document.getElementById('hint-explanation').style.display = "none"; document.getElementById('btn-apply').style.display = "none"; drawGrid(); }
-        function getRegionName(id) { const names = ["Rose", "Verte", "Bleue", "Jaune", "Violette"]; return names[id] || "Inconnue"; }
+        function getRegionName(id) { const n = ["Rose", "Verte", "Bleue", "Jaune", "Violette"]; return n[id] || "Inconnue"; }
         function updateHearts() { document.getElementById('hearts-display').textContent = "❤️".repeat(Math.max(0, hearts)) || "☠️ Game Over"; }
-        function checkWinCondition() { let won = true; for (let i = 0; i < 25; i++) { if (solution[i] === true && playerGrid[i] !== "🐱") won = false; } if (won) { setTimeout(() => { alert("🎉 Miaou-gnifique !"); cancelCurrentHint(); }, 200); } }
+        function checkWinCondition() { let w = true; for (let i = 0; i < 25; i++) { if (solution[i] === true && playerGrid[i] !== "🐱") w = false; } if (w) { setTimeout(function() { alert("🎉 Miaou-gnifique !"); cancelCurrentHint(); }, 200); } }
         function resetBoard() { playerGrid = Array(25).fill(""); hearts = 3; clickTimers = {}; cancelCurrentHint(); updateHearts(); }
         drawGrid();
     </script>
