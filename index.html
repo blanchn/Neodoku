@@ -91,6 +91,7 @@
             border-radius: 6px;
             transition: background-color 0.2s;
             touch-action: manipulation; 
+            position: relative;
         }
 
         .reg-0 { background-color: var(--color-0); }
@@ -103,16 +104,42 @@
             background-color: #ffb3b3 !important;
         }
 
+        /* Style pour la prévisualisation de l'indice */
+        .cell.hint-preview {
+            animation: pulse-hint 1.5s infinite alternate;
+            z-index: 5;
+        }
+
+        @keyframes pulse-hint {
+            0% { box-shadow: inset 0 0 0 3px #ecc94b; background-color: #fefcbf; }
+            100% { box-shadow: inset 0 0 0 5px #d69e2e; background-color: #faf089; }
+        }
+
+        /* Zone d'explication de l'indice */
+        .hint-box {
+            display: none;
+            background-color: #feebc8;
+            border: 1px solid #fbd38d;
+            color: #c05621;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            font-weight: 500;
+        }
+
         .tools {
             display: flex;
             justify-content: center;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .action-btn {
             flex: 1;
+            min-width: 120px;
             padding: 12px;
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             font-weight: bold;
             background-color: #4a5568;
             color: white;
@@ -123,6 +150,11 @@
 
         .hint-btn {
             background-color: #ff8e9e;
+        }
+
+        .apply-btn {
+            background-color: #319795;
+            display: none;
         }
     </style>
 </head>
@@ -135,7 +167,7 @@
 
         <div class="rules">
             <strong>Contrôles :</strong> Un clic = ❌ | Double-clic = 🐱 <br>
-            <strong>Règles :</strong> 1 Chat par ligne, colonne et bloc de couleur. Les chats ne doivent pas se toucher (même en diagonale).
+            <strong>Règles :</strong> 1 Chat par ligne, colonne et bloc de couleur. Les chats ne se touchent jamais.
         </div>
 
         <div class="status-bar">
@@ -145,23 +177,19 @@
 
         <div class="grid" id="game-grid"></div>
 
+        <!-- Boîtier d'explication dynamique -->
+        <div class="hint-box" id="hint-explanation"></div>
+
         <div class="tools">
-            <button class="action-btn hint-btn" onclick="giveHint()">Indice 💡</button>
+            <button class="action-btn hint-btn" id="btn-hint" onclick="prepareHint()">Indice 💡</button>
+            <button class="action-btn apply-btn" id="btn-apply" onclick="applyHint()">Appliquer l'indice ⚡</button>
             <button class="action-btn" onclick="resetBoard()">Recommencer</button>
         </div>
     </div>
 
     <script>
-        // Grille Meowdoku corrigée
-        const regions = [
-            0, 0, 0, 1, 1,
-            0, 2, 2, 1, 3,
-            2, 2, 4, 3, 3,
-            4, 4, 4, 4, 3,
-            4, 4, 4, 3, 3
-        ];
+        const regions =;
 
-        // Solution associée
         const solution = [
             false, true,  false, false, false,
             false, false, false, true,  false,
@@ -173,6 +201,7 @@
         let playerGrid = Array(25).fill(""); 
         let hearts = 3;
         let clickTimers = {}; 
+        let pendingHintCells = []; // Stocke les index des cases ciblées par l'indice courant
 
         function drawGrid() {
             const gridEl = document.getElementById('game-grid');
@@ -183,6 +212,12 @@
                 cell.className = "cell reg-" + regions[i];
                 cell.textContent = playerGrid[i];
                 
+                // Si la case fait partie de la proposition d'indice en cours et est encore vide
+                if (pendingHintCells.includes(i) && playerGrid[i] === "") {
+                    cell.classList.add('hint-preview');
+                    cell.textContent = "❓";
+                }
+
                 cell.addEventListener('click', (e) => {
                     e.preventDefault();
                     handleGridTouch(i, cell);
@@ -194,6 +229,7 @@
 
         function handleGridTouch(index, cellElement) {
             if (hearts <= 0) return;
+            cancelCurrentHint(); // Annule l'indice visuel si le joueur joue ailleurs
 
             if (clickTimers[index]) {
                 clearTimeout(clickTimers[index]);
@@ -239,82 +275,117 @@
             }
         }
 
-        function giveHint() {
+        // ÉTAPE 1 : Générer, expliquer et prévisualiser l'indice
+        function prepareHint() {
             if (hearts <= 0) return;
+            cancelCurrentHint();
 
-            // Trouver un chat de la solution qui n'a pas encore été trouvé par le joueur
-            let targetIndex = -1;
+            let hintFound = false;
+            let explanationText = "";
+            pendingHintCells = [];
+
+            // 1. Chercher d'abord un chat VALIDÉ sur la grille pour éliminer ses voisins directs (règles de base)
             for (let i = 0; i < 25; i++) {
-                if (solution[i] === true && playerGrid[i] !== "🐱") {
-                    targetIndex = i;
-                    break;
-                }
-            }
+                if (playerGrid[i] === "🐱") {
+                    let row = Math.floor(i / 5);
+                    let col = i % 5;
+                    let reg = regions[i];
 
-            // Si tous les chats sont déjà placés
-            if (targetIndex === -1) {
-                alert("Vous avez déjà trouvé l'emplacement de tous les chats ! Remplissez le reste avec des croix ❌.");
-                return;
-            }
-
-            // Calculer la ligne et la colonne du chat cible
-            let targetRow = Math.floor(targetIndex / 5);
-            let targetCol = targetIndex % 5;
-            let targetRegion = regions[targetIndex];
-
-            // Remplir stratégiquement la grille avec des croix d'aide
-            let addedX = false;
-            for (let i = 0; i < 25; i++) {
-                let row = Math.floor(i / 5);
-                let col = i % 5;
-                
-                // Si la case fait partie de la même ligne, colonne ou région, mais n'est pas le chat lui-même
-                if (i !== targetIndex && (row === targetRow || col === targetCol || regions[i] === targetRegion)) {
-                    if (playerGrid[i] === "") {
-                        playerGrid[i] = "❌";
-                        addedX = true;
+                    // Trouver les cases vides sur sa ligne/colonne/région à marquer d'une croix
+                    for (let j = 0; j < 25; j++) {
+                        if (i !== j && playerGrid[j] === "") {
+                            let r = Math.floor(j / 5);
+                            let c = j % 5;
+                            if (r === row || c === col || regions[j] === reg) {
+                                pendingHintCells.push(j);
+                            }
+                        }
                     }
-                }
-            }
 
-            if (addedX) {
-                drawGrid();
-            } else {
-                // Si les croix d'aide étaient déjà là, on montre directement l'emplacement du chat
-                playerGrid[targetIndex] = "🐱";
-                drawGrid();
-                checkWinCondition();
-            }
-        }
-
-        function updateHearts() {
-            const container = document.getElementById('hearts-display');
-            container.textContent = "❤️".repeat(Math.max(0, hearts)) || "☠️ Game Over";
-        }
-
-        function checkWinCondition() {
-            let won = true;
-            for (let i = 0; i < 25; i++) {
-                if (solution[i] === true && playerGrid[i] !== "🐱") {
-                    won = false;
-                }
-            }
-            if (won) {
-                setTimeout(() => {
-                    alert("🎉 Miaou-gnifique ! Vous avez résolu la grille parfaitement !");
-                }, 200);
-            }
-        }
-
-        function resetBoard() {
-            playerGrid = Array(25).fill("");
-            hearts = 3;
-            clickTimers = {};
-            updateHearts();
-            drawGrid();
-        }
-
-        drawGrid();
-    </script>
-</body>
-</html>
+                    if (pendingHintCells.length > 0) {
+                        explanationText = `💡 <strong>Logique :</strong> Vous avez placé un chat en Ligne ${row + 1}, Colonne ${col + 1}. En vertu des règles, aucune autre case de cette ligne, de cette colonne ou de la zone de couleur <strong>${getRegionName(reg)}</strong> ne peut en contenir.`;
+hintFound = true;
+break;
+}
+}
+}
+// 2. Si aucune piste simple, analyser la solution pour guider vers un bloc non résolu
+if (!hintFound) {
+for (let i = 0; i < 25; i++) {
+if (solution[i] === true && playerGrid[i] !== "🐱") {
+let row = Math.floor(i / 5);
+let col = i % 5;
+let reg = regions[i];
+for (let j = 0; j < 25; j++) {
+if (i !== j && playerGrid[j] === "") {
+let r = Math.floor(j / 5);
+let c = j % 5;
+if (r === row || c === col || regions[j] === reg) {
+pendingHintCells.push(j);
+}
+}
+}
+if (pendingHintCells.length > 0) {
+explanationText = 💡 <strong>Logique :</strong> Analysez le bloc de couleur <strong>${getRegionName(reg)}</strong> ou la Ligne ${row + 1}. Un chat doit obligatoirement y être confiné, ce qui condamne les cases clignotantes !;
+hintFound = true;
+break;
+}
+}
+}
+}
+// Affichage des éléments d'aide si une action est disponible
+if (hintFound && pendingHintCells.length > 0) {
+document.getElementById('hint-explanation').innerHTML = explanationText;
+document.getElementById('hint-explanation').style.display = "block";
+document.getElementById('btn-apply').style.display = "inline-block";
+drawGrid();
+} else {
+alert("Toutes les croix évidentes sont déjà placées ! Concentrez-vous sur la position des chats restants.");
+}
+}
+// ÉTAPE 2 : Appliquer les modifications suggérées par l'indice
+function applyHint() {
+if (pendingHintCells.length === 0) return;
+pendingHintCells.forEach(index => {
+if (playerGrid[index] === "") {
+playerGrid[index] = "❌";
+}
+});
+cancelCurrentHint();
+}
+function cancelCurrentHint() {
+pendingHintCells = [];
+document.getElementById('hint-explanation').style.display = "none";
+document.getElementById('btn-apply').style.display = "none";
+drawGrid();
+}
+function getRegionName(id) {
+const names = ["Rose", "Verte", "Bleue", "Jaune", "Violette"];
+return names[id] || "Inconnue";
+}
+function updateHearts() {
+const container = document.getElementById('hearts-display');
+container.textContent = "❤️".repeat(Math.max(0, hearts)) || "☠️ Game Over";
+}
+function checkWinCondition() {
+let won = true;
+for (let i = 0; i < 25; i++) {
+if (solution[i] === true && playerGrid[i] !== "🐱") {
+won = false;
+}
+}
+if (won) {
+setTimeout(() => {
+alert("🎉 Miaou-gnifique ! Vous avez résolu la grille parfaitement !");
+cancelCurrentHint();
+}, 200);
+}
+}
+function resetBoard() {
+playerGrid = Array(25).fill("");
+hearts = 3;
+clickTimers = {};
+cancelCurrentHint();
+updateHearts();
+}
+drawGrid();
